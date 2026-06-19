@@ -38,7 +38,7 @@ public class BackgroundPriceUpdater : BackgroundService
 
             var priceTrackers = await dbContext
                 .ApartmentPriceTrackers.Where(x => x.Subscriptions.Any())
-                .ToListAsync();
+                .ToListAsync(cancellationToken);
 
             foreach (var priceTracker in priceTrackers)
             {
@@ -78,7 +78,7 @@ public class BackgroundPriceUpdater : BackgroundService
                         var subcriberMails = await dbContext
                             .Subscriptions.Where(x => x.ApartmentTracker == priceTracker)
                             .Select(x => x.Subscriber.SubscriberMail)
-                            .ToArrayAsync();
+                            .ToArrayAsync(cancellationToken);
 
                         await _mailSender.SendPriceNotificationUpdateAsync(
                             new MailPackage()

@@ -2,6 +2,7 @@
 using Microsoft.EntityFrameworkCore;
 using Objective.PriceTracker.Api.Models;
 using Objective.PriceTracker.Api.Models.Database;
+using Objective.PriceTracker.Api.Models.Responses;
 using Objective.PriceTracker.Api.Services.Database;
 using Objective.PriceTracker.Api.Services.Interfaces;
 
@@ -24,7 +25,11 @@ public partial class PrinzipSubscriptionHandler : IPrinzipSubscriptionHandler
         _serviceScopeFactory = serviceScopeFactory;
     }
 
-    public async Task<SubscriptionResult> HandleSubscriptionAsync(string mail, string url)
+    public async Task<SubscriptionResult> HandleSubscriptionAsync(
+        string mail,
+        string url,
+        CancellationToken cancellationToken
+    )
     {
         var match = UrlRegex.Match(url);
 
@@ -58,7 +63,7 @@ public partial class PrinzipSubscriptionHandler : IPrinzipSubscriptionHandler
                 .Subscribers.Upsert(new DbSubscriber() { SubscriberMail = mail })
                 .On(x => x.SubscriberMail)
                 .WhenMatched((x, xi) => new DbSubscriber() { SubscriberMail = xi.SubscriberMail })
-                .RunAndReturnAsync()
+                .RunAndReturnAsync(cancellationToken)
         ).Single();
 
         // fetch or add price tracker for current apartment id
@@ -76,7 +81,7 @@ public partial class PrinzipSubscriptionHandler : IPrinzipSubscriptionHandler
                 .WhenMatched(
                     (x, xi) => new DbApartmentPriceTracker() { ApartmentId = xi.ApartmentId }
                 )
-                .RunAndReturnAsync()
+                .RunAndReturnAsync(cancellationToken)
         ).Single();
 
         dbContext.Subscriptions.Add(
@@ -85,7 +90,7 @@ public partial class PrinzipSubscriptionHandler : IPrinzipSubscriptionHandler
 
         try
         {
-            await dbContext.SaveChangesAsync();
+            await dbContext.SaveChangesAsync(cancellationToken);
             return SubscriptionResult.Success;
         }
         catch (DbUpdateException dbUpdateException)
@@ -110,5 +115,44 @@ public partial class PrinzipSubscriptionHandler : IPrinzipSubscriptionHandler
 
             return SubscriptionResult.Error;
         }
+    }
+
+    public async Task<List<PrinzipApartmentPrice>> GetCurrentSubscribedApartments(
+        string mail,
+        CancellationToken cancellationToken
+    )
+    {
+        using var scope = _serviceScopeFactory.CreateScope();
+        var dbContext = scope.ServiceProvider.GetRequiredService<PriceTrackerDbContext>();
+
+        var subscriber = await dbContext.Subscribers.SingleOrDefaultAsync(
+            x => x.SubscriberMail == mail,
+            cancellationToken
+        );
+
+        if (subscriber is null)
+            return [];
+
+        var prices = new List<PrinzipApartmentPrice>();
+
+        await foreach (
+            var apartPriceTracker in dbContext
+                .Subscriptions.Where(x => x.Subscriber == subscriber)
+                .Select(x => x.ApartmentTracker)
+                .Where(x => x.LastPrice != null)
+                .AsAsyncEnumerable()
+        )
+        {
+            prices.Add(
+                new PrinzipApartmentPrice()
+                {
+                    Price = apartPriceTracker.LastPrice.GetValueOrDefault(),
+                    ApartmentUrl =
+                        $"https://prinzip.su/flats/{apartPriceTracker!.ProjectName}/{apartPriceTracker.ApartmentId}/",
+                }
+            );
+        }
+
+        return prices;
     }
 }

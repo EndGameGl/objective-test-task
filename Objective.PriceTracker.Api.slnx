@@ -1,5 +1,6 @@
 <Solution>
   <Folder Name="/src/">
+    <Project Path="src/ConcurrentIncrementer/ConcurrentIncrementer.csproj" Id="bae1de79-60d0-4eb4-a53d-3ee629fb85f4" />
     <Project Path="src/Objective.PriceTracker.Api/Objective.PriceTracker.Api.csproj" />
   </Folder>
   <Project Path="docker-compose.dcproj">

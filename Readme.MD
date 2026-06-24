@@ -3,7 +3,7 @@
 ## Launching project
 - `cd` into root folder
 - `docker compose up -d` to boot up the project
-- API will be available at https://localhost:15457
+- API will be available at http://localhost:15456
 
 ## Public endpoints
 | Endpoint | Method |  Parameters | Description |

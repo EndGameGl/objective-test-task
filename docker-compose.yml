@@ -4,6 +4,9 @@ services:
     build:
       context: .
       dockerfile: src/Objective.PriceTracker.Api/Dockerfile
+    depends_on: 
+      postgresql:
+        condition: service_healthy
 
   postgresql:
     image: postgres:latest
